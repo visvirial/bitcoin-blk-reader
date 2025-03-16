@@ -1,0 +1,16 @@
+[package]
+name = "bitcoin-blk-reader"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+hex = "0.4.3"
+bytes = "1.10.1"
+num-format = "0.4.4"
+tokio = { version = "1.44.1", features = ["rt", "macros"] }
+reqwest = "0.12.14"
+bitcoin_hashes = "0.16.0"
+
+[[bin]]
+name = "test_blk_reader"
+path = "src/bin/test_blk_reader.rs"
