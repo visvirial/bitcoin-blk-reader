@@ -29,7 +29,7 @@ pub async fn main() {
     let mut blk_reader = BlkReader::new(rest_endpoint.clone(), blocks_dir.clone());
     let start_time = SystemTime::now();
     blk_reader.init(0).await.unwrap();
-    println!("Initialized in {}ms.", start_time.elapsed().unwrap().as_millis().to_formatted_string(&Locale::en));
+    eprintln!("Initialized in {}ms.", start_time.elapsed().unwrap().as_millis().to_formatted_string(&Locale::en));
     let start_time = SystemTime::now();
     for (height, block, magic) in blk_reader {
         // Write magic bytes.
@@ -40,7 +40,7 @@ pub async fn main() {
         writer.write_all(&block).unwrap();
         let mut block_hash = block_to_block_hash(&block);
         block_hash.reverse();
-        println!("Height: {}, Block ID: {}", height.to_formatted_string(&Locale::en), hex::encode(block_hash));
+        eprintln!("Height: {}, Block ID: {}", height.to_formatted_string(&Locale::en), hex::encode(block_hash));
     }
-    println!("All blocks written in {}ms.", start_time.elapsed().unwrap().as_millis().to_formatted_string(&Locale::en));
+    eprintln!("All blocks written in {}ms.", start_time.elapsed().unwrap().as_millis().to_formatted_string(&Locale::en));
 }
