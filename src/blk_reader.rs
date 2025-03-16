@@ -17,28 +17,6 @@ use crate::{
     BitcoinRest,
 };
 
-#[derive(Debug, Clone)]
-pub struct BlkReaderData {
-    // Block height -> block,
-    blocks: HashMap<u32, Bytes>,
-    block_height_by_hash: HashMap<[u8; 32], u32>,
-    next_blk_index: u32,
-    next_height: u32,
-    all_read: bool,
-}
-
-impl BlkReaderData {
-    pub fn new() -> Self {
-        Self {
-            blocks: HashMap::new(),
-            block_height_by_hash: HashMap::new(),
-            next_blk_index: 0,
-            next_height: 0,
-            all_read: false,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct BlkFileReader {
     reader: BufReader<File>,
@@ -66,6 +44,28 @@ impl Read for BlkFileReader {
             self.position += 1;
         }
         Ok(read)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BlkReaderData {
+    // Block height -> (block, magic),
+    blocks: HashMap<u32, (Bytes, [u8; 4])>,
+    block_height_by_hash: HashMap<[u8; 32], u32>,
+    next_blk_index: u32,
+    next_height: u32,
+    all_read: bool,
+}
+
+impl BlkReaderData {
+    pub fn new() -> Self {
+        Self {
+            blocks: HashMap::new(),
+            block_height_by_hash: HashMap::new(),
+            next_blk_index: 0,
+            next_height: 0,
+            all_read: false,
+        }
     }
 }
 
@@ -160,6 +160,9 @@ impl BlkReader {
                 return Ok(block_count);
             }
             let size = u32::from_le_bytes(size);
+            if size <= 80 {
+                return Ok(block_count);
+            }
             //println!("Block size: {}", size);
             // Read block.
             let mut block_vec = vec![0u8; size as usize];
@@ -177,7 +180,7 @@ impl BlkReader {
             let block_height = block_height.unwrap();
             //println!("Block height: {}", block_height);
             // Save blcok.
-            self.data.write().unwrap().blocks.insert(block_height, Bytes::from(block_vec));
+            self.data.write().unwrap().blocks.insert(block_height, (Bytes::from(block_vec), magic));
         }
     }
     pub fn read_next_file(&mut self) -> Result<u32, ()> {
@@ -193,17 +196,17 @@ impl BlkReader {
         }
         Ok(block_count.unwrap())
     }
-    pub fn try_get_next_block(&mut self) -> Option<(u32, Bytes)> {
+    pub fn try_get_next_block(&mut self) -> Option<(u32, Bytes, [u8; 4])> {
         let mut data = self.data.write().unwrap();
         let next_height = data.next_height;
         if let Some(block) = data.blocks.remove(&next_height) {
             let height = data.next_height;
             data.next_height += 1;
-            return Some((height, block));
+            return Some((height, block.0, block.1));
         }
         None
     }
-    pub fn get_next_block(&mut self) -> Option<(u32, Bytes)> {
+    pub fn get_next_block(&mut self) -> Option<(u32, Bytes, [u8; 4])> {
         if self.data.read().unwrap().next_height > self.end_height {
             return None;
         }
@@ -223,7 +226,7 @@ impl BlkReader {
 }
 
 impl Iterator for BlkReader {
-    type Item = (u32, Bytes);
+    type Item = (u32, Bytes, [u8; 4]);
     fn next(&mut self) -> Option<Self::Item> {
         self.get_next_block()
     }

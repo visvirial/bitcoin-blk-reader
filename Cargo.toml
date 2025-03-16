@@ -15,5 +15,9 @@ reqwest = "0.12.14"
 bitcoin_hashes = "0.16.0"
 
 [[bin]]
+name = "gen_bootstrap_dat"
+path = "src/bin/gen_bootstrap_dat.rs"
+
+[[bin]]
 name = "test_blk_reader"
 path = "src/bin/test_blk_reader.rs"
