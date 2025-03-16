@@ -32,11 +32,15 @@ pub async fn main() {
     println!("Initialized in {}ms.", start_time.elapsed().unwrap().as_millis().to_formatted_string(&Locale::en));
     let start_time = SystemTime::now();
     for (height, block, magic) in blk_reader {
+        // Write magic bytes.
         writer.write_all(&magic).unwrap();
+        // Write block size.
+        writer.write_all(&(block.len() as u32).to_le_bytes()).unwrap();
+        // Write block body.
         writer.write_all(&block).unwrap();
         let mut block_hash = block_to_block_hash(&block);
         block_hash.reverse();
         println!("Height: {}, Block ID: {}", height.to_formatted_string(&Locale::en), hex::encode(block_hash));
     }
-    println!("Fetched all blocks in {}ms.", start_time.elapsed().unwrap().as_millis().to_formatted_string(&Locale::en));
+    println!("All blocks written in {}ms.", start_time.elapsed().unwrap().as_millis().to_formatted_string(&Locale::en));
 }
