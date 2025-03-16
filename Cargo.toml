@@ -2,6 +2,9 @@
 name = "bitcoin-blk-reader"
 version = "0.0.1"
 edition = "2024"
+description = "Bitcoin blk*.dat reader"
+license = "MIT"
+repository = "https://github.com/visvirial/bitcoin-blk-reader"
 
 [dependencies]
 hex = "0.4.3"
