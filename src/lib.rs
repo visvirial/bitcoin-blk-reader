@@ -4,9 +4,14 @@ use bitcoin_hashes::{
 };
 
 pub mod bitcoin_rest;
-pub use bitcoin_rest::BitcoinRest;
+pub use bitcoin_rest::{
+    BitcoinRest,
+    BitcoinRestError,
+};
 pub mod blk_reader;
-pub use blk_reader::BlkReader;
+pub use blk_reader::{
+    BlkReader,
+};
 
 pub fn block_to_block_hash(block: &[u8]) -> [u8; 32] {
     if block.len() < 80 {

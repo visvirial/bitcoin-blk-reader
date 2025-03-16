@@ -22,7 +22,7 @@ pub async fn main() {
     let blocks_dir = &args[2];
     let mut blk_reader = BlkReader::new(rest_endpoint.clone(), blocks_dir.clone());
     let start_time = SystemTime::now();
-    blk_reader.init(0).await;
+    blk_reader.init(0).await.unwrap();
     println!("Initialized in {}ms.", start_time.elapsed().unwrap().as_millis().to_formatted_string(&Locale::en));
     let start_time = SystemTime::now();
     for (height, block) in blk_reader {

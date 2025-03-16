@@ -47,14 +47,14 @@ pub struct BlkFileReader {
 }
 
 impl BlkFileReader {
-    pub fn new(path: &str, xor: [u8; 8]) -> Self {
-        let file = File::open(path).unwrap();
+    pub fn new(path: &str, xor: [u8; 8]) -> Result<Self, std::io::Error> {
+        let file = File::open(path)?;
         let reader = BufReader::new(file);
-        Self {
+        Ok(Self {
             reader,
             xor,
             position: 0,
-        }
+        })
     }
 }
 
@@ -73,7 +73,6 @@ impl Read for BlkFileReader {
 pub struct BlkReader {
     rest_endpoint: String,
     blocks_dir: String,
-    max_blocks: u32,
     end_height: u32,
     xor: [u8; 8],
     data: Arc<RwLock<BlkReaderData>>,
@@ -84,23 +83,22 @@ impl BlkReader {
         Self {
             rest_endpoint,
             blocks_dir,
-            max_blocks: 5000,
             end_height: 0,
             xor: [0u8; 8],
             data: Arc::new(RwLock::new(BlkReaderData::new())),
         }
     }
-    pub async fn init(&mut self, starting_height: u32) {
-        self.xor = self.read_xor();
+    pub async fn init(&mut self, starting_height: u32) -> Result<(), Box<dyn std::error::Error>> {
+        self.xor = self.read_xor()?;
         //println!("XOR: {}", hex::encode(self.xor));
         let bitcoin_rest = BitcoinRest::new(self.rest_endpoint.clone());
         // Get starting block hash.
-        let start_block_hash = bitcoin_rest.get_blockhashbyheight(starting_height).await.unwrap();
+        let start_block_hash = bitcoin_rest.get_blockhashbyheight(starting_height).await?;
         //println!("Starting block hash: {}", hex::encode(start_block_hash));
         // Download all block headers.
         //println!("Fetching all block headers...");
         //let start_time = SystemTime::now();
-        let headers = bitcoin_rest.get_all_headers(start_block_hash, None).await.unwrap();
+        let headers = bitcoin_rest.get_all_headers(start_block_hash, None).await?;
         //let blocks_len = headers.len();
         //println!("Fetched {} block headers in {}ms.", blocks_len, start_time.elapsed().unwrap().as_millis());
         // Convert to block_height_by_hash.
@@ -111,13 +109,10 @@ impl BlkReader {
         }
         self.data.write().unwrap().next_height = starting_height;
         self.end_height = starting_height + headers.len() as u32 - 1;
+        Ok(())
     }
     pub fn is_all_read(&self) -> bool {
         self.data.read().unwrap().all_read
-    }
-    pub fn set_max_blocks(mut self, max_blocks: u32) -> Self {
-        self.max_blocks = max_blocks;
-        self
     }
     pub fn get_registered_block_count(&self) -> usize {
         self.data.read().unwrap().blocks.len()
@@ -125,24 +120,32 @@ impl BlkReader {
     pub fn get_next_height(&self) -> u32 {
         self.data.read().unwrap().next_height
     }
-    pub fn read_xor(&self) -> [u8; 8] {
+    pub fn read_xor(&self) -> Result<[u8; 8], std::io::Error> {
         let path = format!("{}/xor.dat", self.blocks_dir);
         let file = File::open(&path);
-        if file.is_err() {
-            return [0u8; 8];
+        if let Err(e) = file {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                return Ok([0u8; 8]);
+            }
+            return Err(e);
         }
         let mut file = file.unwrap();
         let mut xor: Vec<u8> = vec![];
-        file.read_to_end(&mut xor).unwrap();
+        file.read_to_end(&mut xor)?;
         if xor.len() != 8 {
             panic!("Invalid xor.dat length.");
         }
-        xor.try_into().unwrap()
+        Ok(xor.try_into().unwrap())
     }
     fn read_file(&mut self, index: u32) -> Result<u32, ()> {
         let path = format!("{}/blk{:05}.dat", self.blocks_dir, index);
         //println!("Reading: {}", path);
-        let mut block_reader = BlkFileReader::new(&path, self.xor);
+        let block_reader = BlkFileReader::new(&path, self.xor);
+        if block_reader.is_err() {
+            self.data.write().unwrap().all_read = true;
+            return Err(());
+        }
+        let mut block_reader = block_reader.unwrap();
         let mut block_count = 0;
         loop {
             // Read magic bytes.
@@ -190,35 +193,6 @@ impl BlkReader {
         }
         Ok(block_count.unwrap())
     }
-    /*
-    pub async fn run_threads(&mut self, concurrency: usize) {
-        let mut handles = Vec::new();
-        for _ in 0..concurrency {
-            let mut this = self.clone();
-            let handle = tokio::spawn(async move {
-                loop {
-                    if this.get_registered_block_count() >= this.max_blocks as usize {
-                        //println!("Max blocks reached.");
-                        sleep(Duration::from_millis(100)).await;
-                        continue;
-                    }
-                    let result = this.read_next_file();
-                    if result.is_err() {
-                        break;
-                    }
-                }
-            });
-            handles.push(handle);
-        }
-        {
-            let this = self.clone();
-            tokio::spawn(async move {
-                futures::future::join_all(handles).await;
-                this.data.write().unwrap().all_read = true;
-            });
-        }
-    }
-    */
     pub fn try_get_next_block(&mut self) -> Option<(u32, Bytes)> {
         let mut data = self.data.write().unwrap();
         let next_height = data.next_height;

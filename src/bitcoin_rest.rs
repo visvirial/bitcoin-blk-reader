@@ -15,11 +15,16 @@ pub enum BitcoinRestError {
 	Response(Response),
 }
 
-#[derive(Debug, Clone)]
-pub struct BitcoinRest {
-    client: reqwest::Client,
-    rest_endpoint: String,
+impl std::fmt::Display for BitcoinRestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Reqwest(e) => write!(f, "Reqwest error: {}", e),
+            Self::Response(e) => write!(f, "Response error: {}", e.status()),
+        }
+    }
 }
+
+impl std::error::Error for BitcoinRestError {}
 
 impl From<reqwest::Error> for BitcoinRestError {
 	fn from(e: reqwest::Error) -> Self {
@@ -31,6 +36,12 @@ impl From<Response> for BitcoinRestError {
 	fn from(e: Response) -> Self {
 		Self::Response(e)
 	}
+}
+
+#[derive(Debug, Clone)]
+pub struct BitcoinRest {
+    client: reqwest::Client,
+    rest_endpoint: String,
 }
 
 impl BitcoinRest {
